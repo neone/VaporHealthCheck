@@ -1,9 +1,106 @@
-.DS_Store
+# Swift Package Manager
 /.build
 /Packages
-xcuserdata/
-DerivedData/
+Package.resolved
+*.swiftpm
 .swiftpm/configuration/registries.json
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+
+# Xcode
+xcuserdata/
+DerivedData/
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcworkspace/contents.xcworkspacedata
+/*.gcno
+**/xcshareddata/WorkspaceSettings.xcsettings
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~.nib
 .netrc
-Package.resolved
+
+# Vapor
+Config/secrets/
+.env
+.env.*
+!.env.example
+
+# Testing
+*.gcov
+*.profdata
+*.profraw
+.build-test/
+
+# Documentation
+.docc-build/
+docs/
+
+# Temporary files
+*.tmp
+*.log
+*.bak
+*.orig
+*.rej
+
+# Certificates and keys (security)
+*.p12
+*.pem
+*.key
+*.crt
+*.cer
+*.der
+*.pfx
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Dependencies
+.dependencies/
