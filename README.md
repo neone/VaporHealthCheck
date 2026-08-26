@@ -11,6 +11,8 @@ A production-ready Swift package that provides a simple, unauthenticated `/healt
 - 🚀 Simple one-line integration with any Vapor 4+ application
 - 🏥 Automatic PostgreSQL connection health checking
 - 📊 Structured JSON response format
+- 🏷️ Reports build `version`, `commit`, `started_at` and `uptime_seconds`
+- 🚦 Opt-in HTTP 503 on degraded status for readiness probes
 - 🔓 Unauthenticated endpoint for monitoring tools
 - ⚡ Async/await support with Swift 6.0
 - 🧪 Fully tested and production-ready
@@ -78,9 +80,26 @@ That's it! The `/health` endpoint is now available.
 ```swift
 HealthCheckConfiguration(
     applicationName: "my-application",  // Your application name
-    enableDatabaseCheck: true            // Enable/disable database health checks (default: true)
+    enableDatabaseCheck: true,          // Enable/disable database health checks (default: true)
+    version: "1.4.2",                   // Reported as `version` (default: APP_VERSION env var)
+    commit: "3f9c1d2",                  // Reported as `commit` (default: GIT_SHA env var)
+    failOnDegraded: false,              // Respond 503 when not `ready` (default: false; readiness probes only)
+    startedAt: Date()                   // Reported as `started_at`; drives `uptime_seconds` (default: now)
 )
 ```
+
+`version` and `commit` fall back to the `APP_VERSION` and `GIT_SHA` environment
+variables, so a container image built with
+
+```dockerfile
+ENV APP_VERSION=1.4.2 GIT_SHA=3f9c1d2
+```
+
+reports them with no code changes. When neither the parameter nor the environment
+variable is set, the field is omitted from the response.
+
+`startedAt` is captured when the configuration is created, which is normally the
+`registerHealthCheck(configuration:)` call in `configure.swift`, i.e. process start.
 
 ## Response Format
 
@@ -91,11 +110,18 @@ HealthCheckConfiguration(
     "status": "ready",
     "application": "my-application",
     "postgres_connection": "ready",
-    "timestamp": "2025-12-12T18:30:00Z"
+    "timestamp": "2026-08-26T18:30:00Z",
+    "version": "1.4.2",
+    "commit": "3f9c1d2",
+    "started_at": "2026-08-26T12:00:00Z",
+    "uptime_seconds": 23400
 }
 ```
 
-### Degraded Response (200 OK)
+`version` and `commit` are omitted when not configured (see
+[Configuration Options](#configuration-options)).
+
+### Degraded Response (200 OK, or 503 with `failOnDegraded`)
 
 When the database is unavailable but the application is running:
 
@@ -104,9 +130,18 @@ When the database is unavailable but the application is running:
     "status": "degraded",
     "application": "my-application",
     "postgres_connection": "unavailable",
-    "timestamp": "2025-12-12T18:30:00Z"
+    "timestamp": "2026-08-26T18:30:00Z",
+    "version": "1.4.2",
+    "commit": "3f9c1d2",
+    "started_at": "2026-08-26T12:00:00Z",
+    "uptime_seconds": 23400
 }
 ```
+
+By default this is served with HTTP 200 so that liveness probes keep the process
+alive while the database recovers. With `failOnDegraded: true` the same body is served
+with HTTP **503 Service Unavailable**, which lets a readiness probe pull the pod out of
+rotation. See [Readiness vs. liveness](#readiness-vs-liveness) before enabling it.
 
 ### Status Values
 
@@ -119,6 +154,11 @@ When the database is unavailable but the application is running:
   - `ready`: Database connection successful
   - `unavailable`: Database connection failed
   - `not_configured`: Database health check disabled
+
+- **version** / **commit**: Free-form strings from configuration or the `APP_VERSION` /
+  `GIT_SHA` environment variables; omitted when unset
+- **started_at**: ISO-8601 instant the health check was registered (process start)
+- **uptime_seconds**: Whole seconds elapsed since `started_at`
 
 ## Testing
 
@@ -153,6 +193,30 @@ readinessProbe:
     port: 8080
   initialDelaySeconds: 5
   periodSeconds: 5
+```
+
+### Readiness vs. liveness
+
+`failOnDegraded` changes the HTTP status only; the JSON body is the same either way.
+
+- **Readiness probes** decide whether a pod receives traffic. A 503 while Postgres is
+  unreachable is exactly what you want: the pod is removed from the Service until the
+  database comes back, and re-added automatically.
+- **Liveness probes** decide whether the container is *killed and restarted*. A 503 on
+  database loss here would restart every pod in a loop for the duration of a Postgres
+  outage, and the restarts do nothing to fix the database.
+
+Enable `failOnDegraded` only if `/health` is used as a readiness probe. If the same
+endpoint also backs a liveness probe, keep the default (`false`) so the liveness probe
+only fails when the process itself cannot answer.
+
+```swift
+app.registerHealthCheck(
+    configuration: HealthCheckConfiguration(
+        applicationName: "my-application",
+        failOnDegraded: true   // readiness probe only
+    )
+)
 ```
 
 ### Docker Compose Example
